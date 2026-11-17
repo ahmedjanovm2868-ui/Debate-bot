@@ -1,5 +1,6 @@
 import os
 import sqlite3
+import threading
 from flask import Flask, render_template_string, request, jsonify
 import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
@@ -141,7 +142,6 @@ HTML_TEMPLATE = """
             border-radius: 8px; 
             box-shadow: inset 0 0 10px rgba(0,255,102,0.05);
         }
-        .emoji-icon { font-size: 1.2em; margin-right: 5px; }
     </style>
 </head>
 <body>
@@ -197,7 +197,7 @@ HTML_TEMPLATE = """
         async function loadSession() {
             let res = await fetch(`/api/session?user_id=${user.id}`);
             let data = await res.json();
-            document.getElementById('session-info`.trim() ? 'session-info' : '').innerText = `🗓️ ${data.session.title}\\n⏰ ${data.session.date}`;
+            document.getElementById('session-info').innerText = `🗓️ ${data.session.title}\\n⏰ ${data.session.date}`;
             let btn = document.getElementById('rsvp-btn');
             if(data.attending) {
                 btn.innerText = "❌ CANCEL MY ATTENDANCE";
@@ -373,5 +373,16 @@ def admin_broadcast():
     return jsonify({"message": f"Broadcast successfully dispatched to {count} participants! 🎯"})
 
 if __name__ == "__main__":
+    # Start Telegram bot polling in a background thread so it doesn't block Flask
+    def run_bot():
+        print("🤖 Telegram Bot Polling Started...")
+        bot.infinity_polling(none_stop=True)
+
+    bot_thread = threading.Thread(target=run_bot)
+    bot_thread.daemon = True
+    bot_thread.start()
+
+    # Start Flask Web Server
     port = int(os.environ.get("PORT", 5000))
+    print(f"🌐 Flask Server Running on port {port}...")
     app.run(host="0.0.0.0", port=port)
