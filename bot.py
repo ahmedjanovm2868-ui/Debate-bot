@@ -339,12 +339,14 @@ def admin_broadcast():
 if __name__ == "__main__":
     def run_bot():
         print("🤖 Telegram Bot Polling Started...")
-        bot.infinity_polling(none_stop=True)
+        bot.infinity_polling(none_stop=True, skip_pending=True)
 
+    # 1. Start bot polling in the background thread FIRST
     bot_thread = threading.Thread(target=run_bot)
     bot_thread.daemon = True
     bot_thread.start()
 
+    # 2. Start Flask web server SECOND
     port = int(os.environ.get("PORT", 5000))
     print(f"🌐 Flask Server Running on port {port}...")
     app.run(host="0.0.0.0", port=port)
