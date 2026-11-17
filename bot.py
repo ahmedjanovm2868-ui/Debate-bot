@@ -53,16 +53,15 @@ def init_db():
 
 init_db()
 
-# Telegram Bot Handlers
+# Telegram Bot Handlers for /start and /admin
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
     user_id = message.from_user.id
     markup = InlineKeyboardMarkup()
     web_app_url = os.getenv("RENDER_EXTERNAL_URL", "http://127.0.0.1:5000")
     
-    # If admin opens start, give them direct access to admin panel
     if user_id in ADMIN_IDS:
-        markup.add(InlineKeyboardButton("🛠 Open Admin Panel", web_app=WebAppInfo(url=f"{web_app_url}/admin")))
+        markup.add(InlineKeyboardButton("🛠 Open Admin Control Panel", web_app=WebAppInfo(url=f"{web_app_url}/admin")))
         bot.reply_to(message, "⚡ **Welcome Commander!** You are recognized as an Admin. Open your control panel below:", reply_markup=markup, parse_mode="Markdown")
     else:
         markup.add(InlineKeyboardButton("🚀 Open Debate Mini App", web_app=WebAppInfo(url=web_app_url)))
@@ -70,7 +69,8 @@ def send_welcome(message):
 
 @bot.message_handler(commands=['admin'])
 def admin_command(message):
-    if message.from_user.id in ADMIN_IDS:
+    user_id = message.from_user.id
+    if user_id in ADMIN_IDS:
         markup = InlineKeyboardMarkup()
         web_app_url = f"{os.getenv('RENDER_EXTERNAL_URL', 'http://127.0.0.1:5000')}/admin"
         markup.add(InlineKeyboardButton("🛠 Open Admin Control Panel", web_app=WebAppInfo(url=web_app_url)))
@@ -78,7 +78,7 @@ def admin_command(message):
     else:
         bot.reply_to(message, "🚫 **Access Denied!** You are not authorized to use admin commands. 🛑")
 
-# Flask Frontend Routes (Admin Panel Route & User App)
+# Flask Frontend Templates
 ADMIN_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -184,7 +184,7 @@ HTML_TEMPLATE = """
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
-        const user = tg.initDataUnsafe?.user || { id: 8342484427, first_name: "Admin" };
+        const user = tg.initDataUnsafe?.user || { id: 8342484427, first_name: "User" };
 
         async function init() {
             let res = await fetch(`/api/user/${user.id}`);
