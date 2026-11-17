@@ -53,13 +53,20 @@ def init_db():
 
 init_db()
 
-# Telegram Bot Handlers with Emojis
+# Telegram Bot Handlers
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
+    user_id = message.from_user.id
     markup = InlineKeyboardMarkup()
     web_app_url = os.getenv("RENDER_EXTERNAL_URL", "http://127.0.0.1:5000")
-    markup.add(InlineKeyboardButton("🚀 Open Debate Mini App", web_app=WebAppInfo(url=web_app_url)))
-    bot.reply_to(message, "🌟 **Welcome to IIS Debate Club!** 🎙️\n\nStep into the arena of rhetoric and logic. Tap the button below to register, RSVP, and join upcoming sessions! 👇", reply_markup=markup, parse_mode="Markdown")
+    
+    # If admin opens start, give them direct access to admin panel
+    if user_id in ADMIN_IDS:
+        markup.add(InlineKeyboardButton("🛠 Open Admin Panel", web_app=WebAppInfo(url=f"{web_app_url}/admin")))
+        bot.reply_to(message, "⚡ **Welcome Commander!** You are recognized as an Admin. Open your control panel below:", reply_markup=markup, parse_mode="Markdown")
+    else:
+        markup.add(InlineKeyboardButton("🚀 Open Debate Mini App", web_app=WebAppInfo(url=web_app_url)))
+        bot.reply_to(message, "🌟 **Welcome to IIS Debate Club!** 🎙️\n\nTap the button below to register and join upcoming sessions! 👇", reply_markup=markup, parse_mode="Markdown")
 
 @bot.message_handler(commands=['admin'])
 def admin_command(message):
@@ -67,11 +74,68 @@ def admin_command(message):
         markup = InlineKeyboardMarkup()
         web_app_url = f"{os.getenv('RENDER_EXTERNAL_URL', 'http://127.0.0.1:5000')}/admin"
         markup.add(InlineKeyboardButton("🛠 Open Admin Control Panel", web_app=WebAppInfo(url=web_app_url)))
-        bot.reply_to(message, "⚡ **Admin Access Granted!** 🛡️\n\nWelcome back, Commander. Open your management dashboard below:", reply_markup=markup, parse_mode="Markdown")
+        bot.reply_to(message, "🔐 **Admin Access Granted!** 🛡️\n\nTap below to open your management dashboard:", reply_markup=markup, parse_mode="Markdown")
     else:
-        bot.reply_to(message, "🚫 **Access Denied!** You do not have administrative privileges for this bot. 🛑")
+        bot.reply_to(message, "🚫 **Access Denied!** You are not authorized to use admin commands. 🛑")
 
-# Flask Frontend Routes with Colorful Styling & Emojis
+# Flask Frontend Routes (Admin Panel Route & User App)
+ADMIN_TEMPLATE = """
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - IIS Debate</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        body { background: #0d0208; color: #00ff66; font-family: 'Courier New', Courier, monospace; padding: 20px; margin: 0; }
+        .container { max-width: 600px; margin: 0 auto; background: #121212; border: 1px solid #00ff6644; padding: 20px; border-radius: 12px; box-shadow: 0 0 25px rgba(0,255,102,0.2); }
+        h2 { text-align: center; color: #fff; text-shadow: 0 0 10px #00ff66; text-transform: uppercase; letter-spacing: 2px; }
+        .card { background: #000; border: 1px solid #00ff6644; padding: 15px; margin-top: 15px; border-radius: 8px; }
+        .btn { background: #003311; color: #00ff66; border: 1px solid #00ff66; padding: 14px; width: 100%; cursor: pointer; margin-top: 15px; font-weight: bold; border-radius: 6px; text-transform: uppercase; font-family: inherit; }
+        .btn:hover { background: #00ff66; color: #0d0208; box-shadow: 0 0 15px #00ff66; }
+        ul { padding-left: 20px; }
+        li { margin: 8px 0; color: #88ffbb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>🛡️ Admin Command Center 🛠️</h2>
+        <div class="card">
+            <h3>👥 Confirmed Participants</h3>
+            <div id="participant-list">🔄 Loading roster...</div>
+        </div>
+        <button class="btn" onclick="broadcastTeams()">📢 Broadcast Channel Link & Announcement 🚀</button>
+    </div>
+    <script>
+        const tg = window.Telegram.WebApp;
+        tg.expand();
+
+        async function loadParticipants() {
+            let res = await fetch('/api/admin/participants');
+            let data = await res.json();
+            let html = "<ul>";
+            if(data.length === 0) {
+                html = "<p style='text-align:center; color:#888;'>No confirmed participants yet for this session. 📭</p>";
+            } else {
+                data.forEach(p => {
+                    html += `<li>👤 <b>${p.full_name}</b> 📞 <code>${p.phone}</code></li>`;
+                });
+                html += "</ul>";
+            }
+            document.getElementById('participant-list').innerHTML = html;
+        }
+        async function broadcastTeams() {
+            let res = await fetch('/api/admin/broadcast', {method: 'POST'});
+            let data = await res.json();
+            alert("✨ " + data.message);
+        }
+        loadParticipants();
+    </script>
+</body>
+</html>
+"""
+
 HTML_TEMPLATE = """
 <!DOCTYPE html>
 <html lang="en">
@@ -88,60 +152,14 @@ HTML_TEMPLATE = """
             --panel-bg: #121212;
             --text-color: #00ff66;
             --border-color: #00ff6644;
-            --accent-glow: rgba(0, 255, 102, 0.2);
         }
-        body {
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            font-family: 'Courier New', Courier, monospace;
-            margin: 0;
-            padding: 20px;
-        }
-        .container {
-            max-width: 600px;
-            margin: 0 auto;
-            background: var(--panel-bg);
-            border: 1px solid var(--border-color);
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 0 25px var(--accent-glow);
-        }
-        h1, h3 { text-align: center; text-transform: uppercase; letter-spacing: 2px; }
-        h1 { color: #fff; text-shadow: 0 0 10px var(--matrix-green); }
-        .btn {
-            background: var(--dark-green);
-            color: var(--matrix-green);
-            border: 1px solid var(--matrix-green);
-            padding: 14px;
-            width: 100%;
-            cursor: pointer;
-            font-weight: bold;
-            font-family: inherit;
-            margin-top: 12px;
-            border-radius: 6px;
-            text-transform: uppercase;
-            transition: all 0.3s ease;
-        }
-        .btn:hover { background: var(--matrix-green); color: var(--bg-color); box-shadow: 0 0 15px var(--matrix-green); }
-        input {
-            width: 100%;
-            padding: 12px;
-            margin: 10px 0;
-            background: #000;
-            border: 1px solid var(--border-color);
-            color: var(--text-color);
-            box-sizing: border-box;
-            font-family: inherit;
-            border-radius: 6px;
-        }
-        .card { 
-            background: #000000aa; 
-            border: 1px solid var(--border-color); 
-            padding: 20px; 
-            margin-top: 15px; 
-            border-radius: 8px; 
-            box-shadow: inset 0 0 10px rgba(0,255,102,0.05);
-        }
+        body { background-color: var(--bg-color); color: var(--text-color); font-family: 'Courier New', Courier, monospace; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; background: var(--panel-bg); border: 1px solid var(--border-color); padding: 20px; border-radius: 12px; }
+        h1, h3 { text-align: center; text-transform: uppercase; letter-spacing: 2px; color: #fff; text-shadow: 0 0 10px var(--matrix-green); }
+        .btn { background: var(--dark-green); color: var(--matrix-green); border: 1px solid var(--matrix-green); padding: 14px; width: 100%; cursor: pointer; font-weight: bold; font-family: inherit; margin-top: 12px; border-radius: 6px; text-transform: uppercase; }
+        .btn:hover { background: var(--matrix-green); color: var(--bg-color); }
+        input { width: 100%; padding: 12px; margin: 10px 0; background: #000; border: 1px solid var(--border-color); color: var(--text-color); box-sizing: border-box; font-family: inherit; border-radius: 6px; }
+        .card { background: #000000aa; border: 1px solid var(--border-color); padding: 20px; margin-top: 15px; border-radius: 8px; }
     </style>
 </head>
 <body>
@@ -150,8 +168,7 @@ HTML_TEMPLATE = """
         <div id="app">
             <div id="reg-section" class="card" style="display:none;">
                 <h3>📝 Member Registration</h3>
-                <p style="text-align:center; color:#88ffbb; font-size:0.9em;">Please enter your details to join the club database:</p>
-                <input type="text" id="fullname" placeholder="👤 Full Name (e.g. Alisher Navoi)">
+                <input type="text" id="fullname" placeholder="👤 Full Name">
                 <input type="text" id="phone" placeholder="📱 Phone Number (+998...)">
                 <button class="btn" onclick="registerUser()">✨ Complete Registration</button>
             </div>
@@ -167,7 +184,7 @@ HTML_TEMPLATE = """
     <script>
         const tg = window.Telegram.WebApp;
         tg.expand();
-        const user = tg.initDataUnsafe?.user || { id: 8342484427, first_name: "TestUser" };
+        const user = tg.initDataUnsafe?.user || { id: 8342484427, first_name: "Admin" };
 
         async function init() {
             let res = await fetch(`/api/user/${user.id}`);
@@ -197,7 +214,7 @@ HTML_TEMPLATE = """
         async function loadSession() {
             let res = await fetch(`/api/session?user_id=${user.id}`);
             let data = await res.json();
-            document.getElementById('session-info').innerText = `🗓️ ${data.session.title}\\n⏰ ${data.session.date}`;
+            document.getElementById('session-info').innerText = `${data.session.title}\\n📅 ${data.session.date}`;
             let btn = document.getElementById('rsvp-btn');
             if(data.attending) {
                 btn.innerText = "❌ CANCEL MY ATTENDANCE";
@@ -222,59 +239,6 @@ HTML_TEMPLATE = """
         }
 
         init();
-    </script>
-</body>
-</html>
-"""
-
-ADMIN_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Admin Dashboard</title>
-    <style>
-        body { background: #0d0208; color: #00ff66; font-family: 'Courier New', Courier, monospace; padding: 20px; }
-        .container { max-width: 600px; margin: 0 auto; background: #121212; border: 1px solid #00ff6644; padding: 20px; border-radius: 12px; box-shadow: 0 0 25px rgba(0,255,102,0.2); }
-        h2 { text-align: center; color: #fff; text-shadow: 0 0 10px #00ff66; }
-        .card { background: #000; border: 1px solid #00ff6644; padding: 15px; margin-top: 15px; border-radius: 8px; }
-        .btn { background: #003311; color: #00ff66; border: 1px solid #00ff66; padding: 14px; width: 100%; cursor: pointer; margin-top: 15px; font-weight: bold; border-radius: 6px; text-transform: uppercase; }
-        .btn:hover { background: #00ff66; color: #0d0208; }
-        ul { padding-left: 20px; }
-        li { margin: 8px 0; color: #88ffbb; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h2>🛡️ Command Center 🛠️</h2>
-        <div class="card">
-            <h3>👥 Confirmed Participants</h3>
-            <div id="participant-list">🔄 Loading roster...</div>
-        </div>
-        <button class="btn" onclick="broadcastTeams()">📢 Broadcast Channel Link & Announcement 🚀</button>
-    </div>
-    <script>
-        async function loadParticipants() {
-            let res = await fetch('/api/admin/participants');
-            let data = await res.json();
-            let html = "<ul>";
-            if(data.length === 0) {
-                html = "<p style='text-align:center; color:#888;'>No confirmed participants yet for this session. 📭</p>";
-            } else {
-                data.forEach(p => {
-                    html += `<li>👤 <b>${p.full_name}</b> 📞 <code>${p.phone}</code></li>`;
-                });
-                html += "</ul>";
-            }
-            document.getElementById('participant-list').innerHTML = html;
-        }
-        async function broadcastTeams() {
-            let res = await fetch('/api/admin/broadcast', {method: 'POST'});
-            let data = await res.json();
-            alert("✨ " + data.message);
-        }
-        loadParticipants();
     </script>
 </body>
 </html>
@@ -328,7 +292,7 @@ def rsvp():
             return jsonify({"success": False})
         att = conn.execute("SELECT * FROM attendance WHERE telegram_id = ? AND session_id = ?",
                            (user_id, session["session_id"])).fetchone()
-        if att and att["status"] == "GOING":
+        if att and att["status"] == 'GOING':
             conn.execute("UPDATE attendance SET status = 'NOT_GOING' WHERE telegram_id = ? AND session_id = ?",
                          (user_id, session["session_id"]))
         else:
@@ -373,7 +337,6 @@ def admin_broadcast():
     return jsonify({"message": f"Broadcast successfully dispatched to {count} participants! 🎯"})
 
 if __name__ == "__main__":
-    # Start Telegram bot polling in a background thread so it doesn't block Flask
     def run_bot():
         print("🤖 Telegram Bot Polling Started...")
         bot.infinity_polling(none_stop=True)
@@ -382,7 +345,6 @@ if __name__ == "__main__":
     bot_thread.daemon = True
     bot_thread.start()
 
-    # Start Flask Web Server
     port = int(os.environ.get("PORT", 5000))
     print(f"🌐 Flask Server Running on port {port}...")
     app.run(host="0.0.0.0", port=port)
